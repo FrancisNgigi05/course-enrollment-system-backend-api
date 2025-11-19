@@ -26,6 +26,19 @@ class Student(db.Model, SerializerMixin):
 
     courses = association_proxy('enrollments', 'course', creator=lambda course_obj: Enrollment(course=course_obj))
 
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "email": self.email,
+            "profile": {
+                "age": self.profile.age,
+                "bio": self.profile.bio,
+                "student_id": self.profile.student_id,
+            },
+            "enrollments": [e.to_dict() for e in self.enrollments]
+        }
+
 
     def __repr__(self):
         return f"<Student {self.id} {self.name} {self.email}>"
@@ -44,6 +57,14 @@ class Profile(db.Model, SerializerMixin):
     student = db.relationship('Student', back_populates='profile')
 
 
+    def to_dict(self):
+        return {
+            "age": self.age,
+            "bio": self.bio,
+            "student_id": self.student_id
+        }
+
+
     def __repr__(self):
         return f"<Profile {self.id} {self.age} {self.bio}>"
 
@@ -56,6 +77,20 @@ class Instructor(db.Model, SerializerMixin):
     name = db.Column(db.String, nullable=False)
     # Relationship between instractor to their associated courses
     courses = db.relationship('Course', back_populates="instructor", cascade="all, delete-orphan")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "courses": [
+                {
+                    "id": course.id,
+                    "title": course.title,
+                    "instructor_id": course.instructor_id
+                } 
+                for course in self.courses
+            ]
+        }
 
     def __repr__(self):
         return f"<Instructor {self.id} {self.name}>"
@@ -78,6 +113,18 @@ class Course(db.Model, SerializerMixin):
 
     students = association_proxy('enrollments', 'student', creator=lambda student_obj: Enrollment(student=student_obj))
 
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+
+            "instructor": {
+                "id": self.instructor.id,
+                "name": self.instructor.name
+            } if self.instructor else None,
+            "student_count": len(self.students)
+        }
+
     def __repr__(self):
         return f"<Course {self.id} {self.title}>"
 
@@ -87,7 +134,7 @@ class Enrollment(db.Model, SerializerMixin):
     serialize_rules = ('-student.enrollments', '-course.enrollments',)
 
     id = db.Column(db.Integer, primary_key=True)
-    grade = db.Column(db.String, nullable=False)
+    grade = db.Column(db.String, nullable=True, default="N/A")
     date_enrolled = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     # Foreing key to store the relationship between student and enrollment
     student_id = db.Column(db.Integer, db.ForeignKey('students.id'))
@@ -96,6 +143,24 @@ class Enrollment(db.Model, SerializerMixin):
 
     student = db.relationship('Student', back_populates="enrollments")
     course = db.relationship('Course', back_populates="enrollments")
+
+    def to_dict(self):
+        return{
+            "id": self.id,
+            "student_id": self.student_id,
+            "course_id": self.course_id,
+            "date_enrolled": self.date_enrolled,
+            "grade":self.grade,
+            "course": {
+                "id": self.course.id,
+                "title": self.course.title,
+                "instructor_id": self.course.instructor_id,
+                "instructor": {
+                    "id": self.course.instructor.id,
+                    "name": self.course.instructor.name
+                }
+            }if self.course else None
+        }
 
     def __repr__(self):
         return f"<Enrollment {self.id} {self.grade} {self.date_enrolled}>"
